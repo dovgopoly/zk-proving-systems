@@ -1,0 +1,16 @@
+node_modules
+.vscode
+.env
+.DS_Store
+
+# Hardhat files
+cache
+artifacts
+
+# TypeChain files
+generated-types
+typechain-types
+
+# circom files
+zkit
+contracts/verifiers
