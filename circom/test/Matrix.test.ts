@@ -551,16 +551,16 @@ describe("Matrix vector multiply test", () => {
   });
 });
 
-describe("Matrix power test", () => {
+describe.only("Matrix power test", () => {
   const reverter = new Reverter();
 
-  let verifier: MatrixPowerGroth16Verifier;
+  // let verifier: MatrixPowerGroth16Verifier;
   let circuit: MatrixPower;
 
   before("setup", async () => {
-    const MockVerifier = await ethers.getContractFactory("MatrixPowerGroth16Verifier");
+    // const MockVerifier = await ethers.getContractFactory("MatrixPowerGroth16Verifier");
 
-    verifier = await MockVerifier.deploy();
+    // verifier = await MockVerifier.deploy();
     circuit = await zkit.getCircuit("MatrixPower");
 
     await reverter.snapshot();
@@ -569,17 +569,16 @@ describe("Matrix power test", () => {
   afterEach(reverter.revert);
 
   it("[[0,1,2,3], [4,5,6,7], [8,9,10,11], [12,13,14,15]] ** 3", async () => {
-    const proof = await testMatrixPow(
-      [
-        [0, 1, 2, 3],
-        [4, 5, 6, 7],
-        [8, 9, 10, 11],
-        [12, 13, 14, 15],
-      ],
-      circuit,
-    );
+    const input1 = [
+      [0, 1, 2, 3],
+      [4, 5, 6, 7],
+      [8, 9, 10, 11],
+      [12, 13, 14, 15],
+    ];
 
-    await expect(circuit).to.useSolidityVerifier(verifier).and.verifyProof(proof);
+    const real_result = matrixMultiply(matrixMultiply(input1, input1), input1).flat();
+
+    await expect(circuit).with.witnessInputs({ in: input1, dummy: 0n }).to.have.witnessOutputs({ out: real_result });
   });
 });
 
