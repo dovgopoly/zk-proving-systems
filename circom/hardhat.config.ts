@@ -30,6 +30,7 @@ const config: HardhatUserConfig = {
   zkit: {
     compilationSettings: {
       onlyFiles: [],
+      optimization: "O2",
     },
   },
   gasReporter: {

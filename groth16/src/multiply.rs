@@ -1,53 +1,48 @@
-use ark_bn254::Fr;
-use ark_relations::lc;
-use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
+use ark_circom::{CircomBuilder, CircomConfig};
+use ark_std::rand::thread_rng;
 
-// Example circuit for proving knowledge of a square root
-struct SquareRootCircuit {
-    public_square: Option<Fr>,
-    private_number: Option<Fr>,
-}
+use ark_bn254::{Bn254, Fr};
+use ark_crypto_primitives::snark::SNARK;
+use ark_groth16::Groth16;
 
-impl ConstraintSynthesizer<Fr> for SquareRootCircuit {
-    fn generate_constraints(self, cs: ConstraintSystemRef<Fr>) -> Result<(), SynthesisError> {
-        // Allocate private input
-        let a = cs.new_witness_variable(|| self.private_number.ok_or(SynthesisError::AssignmentMissing))?;
+type GrothBn = Groth16<Bn254>;
 
-        // Allocate public input
-        let b = cs.new_input_variable(|| self.public_square.ok_or(SynthesisError::AssignmentMissing))?;
+pub fn prove_multiply() -> anyhow::Result<bool> {
+    let cfg = CircomConfig::<Fr>::new(
+        "../artifacts/MatrixPower.wasm",
+        "../artifacts/MatrixPower.r1cs"
+    ).map_err(|e| anyhow::anyhow!(e))?;
 
-        // Enforce a * a = b
-        cs.enforce_constraint(lc!() + a, lc!() + a, lc!() + b)?;
+    let mut builder = CircomBuilder::new(cfg);
 
-        Ok(())
-    }
+    (0..16).into_iter().for_each(|i| builder.push_input("in", i));
+    builder.push_input("dummy", 0);
+
+    let circom = builder.setup();
+
+    let mut rng = thread_rng();
+    let params = GrothBn::generate_random_parameters_with_reduction(circom, &mut rng)?;
+
+    let circom = builder.build().map_err(|e| anyhow::anyhow!(e))?;
+
+    let inputs = circom.get_public_inputs().unwrap();
+
+    let proof = GrothBn::prove(&params, circom, &mut rng)?;
+
+    let pvk = GrothBn::process_vk(&params.vk)?;
+
+    let verified = GrothBn::verify_with_processed_vk(&pvk, &inputs, &proof)?;
+
+    Ok(verified)
 }
 
 #[cfg(test)]
 mod test {
-    use std::ops::MulAssign;
     use super::*;
-    use ark_bls12_381::{Bls12_381, Fr as BlsFr};
-    use ark_groth16::Groth16;
-    use ark_snark::SNARK;
-    use ark_std::{UniformRand};
-    use rand::rngs::OsRng;
 
-    #[test]
-    fn test_docs() {
-        use ark_ff::{Field, PrimeField};
-        use ark_bn254::Fr;
-
-        // Creating field elements
-        let a = Fr::from(5);
-        let b = Fr::from(3);
-
-        // Field operations
-        let sum = a + b;
-        let product = a * b;
-        let inverse = a.inverse().unwrap(); // Multiplicative inverse
-        
-        println!("Sum: {}", inverse);
+    #[tokio::test]
+    async fn test_docs() {
+        println!("{}", prove_multiply().unwrap());
     }
     
     // #[test]
