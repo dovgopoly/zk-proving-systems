@@ -6,3 +6,6 @@ edition = "2021"
 [dependencies]
 spartan = { workspace = true }
 merlin = { workspace = true }
+anyhow = { workspace = true }
+curve25519-dalek = "4.1.3"
+rand = "0.8.5"

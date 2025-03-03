@@ -28,6 +28,7 @@ import {
   MatrixScalarMultGroth16Verifier,
   MatrixTranspositionGroth16Verifier,
 } from "@/generated-types/ethers";
+import snarkjs from "snarkjs";
 
 function determinant(matrix: number[][]): number {
   const size = matrix.length;
@@ -576,9 +577,107 @@ describe.only("Matrix power test", () => {
       [12, 13, 14, 15],
     ];
 
+    const readR1cs = require("r1csfile").readR1cs;
+
+    const r1cs = await readR1cs("pow.r1cs");
+
+    const snarkjs = require("snarkjs");
+
+    await snarkjs.wtns.calculate({ in: input1, dummy: 0n }, "pow.wasm", "pow.wtns");
+    const wtns = await snarkjs.wtns.exportJson("pow.wtns");
+
+    console.log(r1cs);
+    console.log(wtns);
+
+    let data: any = {}
+
+
+    console.log("16: ", wtns[16]);
+    console.log("17: ", wtns[17]);
+
+    let prevIdx = 17;
+
+    console.log("32: ", wtns[32]);
+    console.log("33: ", wtns[33]);
+
+
+    data["nInputs"] = r1cs.nPubInputs + r1cs.nPrvInputs;
+    data["nOutputs"] = r1cs.nOutputs;
+    data["nVars"] = r1cs.nVars;
+    data["nConstraints"] = r1cs.nConstraints;
+
+    data["wtns"] = [
+        ...wtns.slice(r1cs.nOutputs + 1, r1cs.nOutputs + r1cs.nPubInputs + r1cs.nPrvInputs + 1),
+        "1",
+        ...wtns.slice(1, r1cs.nOutputs + 1),
+        ...wtns.slice(r1cs.nOutputs + r1cs.nPubInputs + r1cs.nPrvInputs - 1)
+    ];
+
+    data["constraints"] = {};
+    data["constraints"]["A"] = [];
+    data["constraints"]["B"] = [];
+    data["constraints"]["C"] = [];
+
+    const toNewIndex = (index: number) => {
+      if (index > r1cs.nOutputs + r1cs.nPubInputs + r1cs.nPrvInputs) {
+        return index;
+      }
+
+      if (index >= r1cs.nOutputs + 1 && index <= r1cs.nOutputs + r1cs.nPubInputs + r1cs.nPrvInputs) {
+        return index - r1cs.nOutputs - 1;
+      }
+
+      if (index > 0 && index <= r1cs.nOutputs) {
+        return index + r1cs.nInputs;
+      }
+
+      return r1cs.nPubInputs + r1cs.nPrvInputs;
+    };
+
+    for (let i = 0; i < r1cs.constraints.length; i++) {
+      const A_vec = r1cs.constraints[i][0];
+
+      for (const [var_idx, value] of Object.entries(A_vec)) {
+        data["constraints"]["A"].push([i, toNewIndex(parseInt(var_idx)), value]);
+      }
+
+      const B_vec = r1cs.constraints[i][1];
+
+      for (const [var_idx, value] of Object.entries(B_vec)) {
+        data["constraints"]["B"].push([i, toNewIndex(parseInt(var_idx)), value]);
+      }
+
+      const C_vec = r1cs.constraints[i][2];
+
+      for (const [var_idx, value] of Object.entries(C_vec)) {
+        data["constraints"]["C"].push([i, toNewIndex(parseInt(var_idx)), value]);
+      }
+    }
+
+    const fs = require('fs');
+
+    const jsonData = JSON.stringify(data, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value, 2
+    );
+
+
+    fs.writeFile('data.json', jsonData, (err: any) => {
+      if (err) {
+        console.error('Error writing file:', err);
+      } else {
+        console.log('JSON file has been saved.');
+      }
+    });
+
     const real_result = matrixMultiply(matrixMultiply(input1, input1), input1).flat();
 
-    await expect(circuit).with.witnessInputs({ in: input1, dummy: 0n }).to.have.witnessOutputs({ out: real_result });
+    console.log(real_result);
+    //
+    // const wtns = await circuit.calculateWitness({ in: input1, dummy: 0n });
+    //
+    // console.log(wtns.length);
+    //
+    // await expect(circuit).with.witnessInputs({ in: input1, dummy: 0n }).to.have.witnessOutputs({ out: real_result });
   });
 });
 

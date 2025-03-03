@@ -3647,7 +3647,10 @@ dependencies = [
 name = "sparta"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "curve25519-dalek",
  "merlin",
+ "rand 0.8.5",
  "spartan",
 ]
 
