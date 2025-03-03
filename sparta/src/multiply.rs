@@ -3,10 +3,152 @@
 extern crate curve25519_dalek;
 extern crate libspartan;
 extern crate merlin;
-use curve25519_dalek::scalar::Scalar;
+
+use std::fs;
 use libspartan::{InputsAssignment, Instance, SNARKGens, VarsAssignment, SNARK};
 use merlin::Transcript;
 use rand::rngs::OsRng;
+
+use serde::{Deserialize, Deserializer};
+use curve25519_dalek::scalar::Scalar;
+use std::str::FromStr;
+use num_bigint::BigUint;
+use num_traits::ToBytes;
+
+#[derive(Debug, Deserialize)]
+struct Circuit {
+    nInputs: usize,
+    nOutputs: usize,
+    nVars: usize,
+    nConstraints: usize,
+
+    #[serde(deserialize_with = "deserialize_scalars")]
+    wtns: Vec<Scalar>,
+
+    constraints: Constraints,
+}
+
+#[derive(Debug, Deserialize)]
+struct Constraints {
+    #[serde(deserialize_with = "deserialize_tuples")]
+    A: Vec<(usize, usize, [u8; 32])>,
+
+    #[serde(deserialize_with = "deserialize_tuples")]
+    B: Vec<(usize, usize, [u8; 32])>,
+
+    #[serde(deserialize_with = "deserialize_tuples")]
+    C: Vec<(usize, usize, [u8; 32])>,
+}
+
+// Convert a string number into Scalar
+fn parse_scalar(value: &str) -> Result<Scalar, String> {
+    let big_int = BigUint::from_str(value).map_err(|e| e.to_string())?;
+    let mut bytes = [0u8; 32];
+    let big_bytes = big_int.to_bytes_le(); // Convert to little-endian bytes
+
+    if big_bytes.len() > 32 {
+        return Err("Number too large for Scalar".to_string());
+    }
+
+    bytes[..big_bytes.len()].copy_from_slice(&big_bytes); // Copy into 32-byte array
+
+    Ok(Scalar::from_canonical_bytes(bytes).unwrap())
+}
+
+// Deserialize a list of string numbers into Scalars
+fn deserialize_scalars<'de, D>(deserializer: D) -> Result<Vec<Scalar>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let strings: Vec<String> = Deserialize::deserialize(deserializer)?;
+    strings
+        .into_iter()
+        .map(|s| parse_scalar(&s).map_err(serde::de::Error::custom))
+        .collect()
+}
+
+// Deserialize tuples where the third element is a Scalar
+fn deserialize_tuples<'de, D>(deserializer: D) -> Result<Vec<(usize, usize, [u8; 32])>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let raw_tuples: Vec<(usize, usize, String)> = Deserialize::deserialize(deserializer)?;
+    raw_tuples
+        .into_iter()
+        .map(|(a, b, s)| {
+            parse_scalar(&s)
+                .map(|scalar| (a, b, scalar.to_bytes()))
+                .map_err(serde::de::Error::custom)
+        })
+        .collect()
+}
+
+pub fn test_r1cs() {
+    // Read JSON from file
+    let file_content = fs::read_to_string("data.json").expect("Failed to read file");
+
+    // Deserialize JSON into Circuit struct
+    let circuit: Circuit = serde_json::from_str(&file_content).expect("Failed to parse JSON");
+
+    let num_cons = circuit.nConstraints;
+    let num_vars = circuit.nVars + circuit.nOutputs;
+    let num_inputs = circuit.nInputs;
+    let num_non_zero_entries = std::cmp::max(
+        circuit.constraints.A.len(), 
+        std::cmp::max(circuit.constraints.B.len(), circuit.constraints.C.len()));
+
+    let inst = Instance::new(
+        num_cons, 
+        num_vars, 
+        num_inputs, 
+        &circuit.constraints.A,
+        &circuit.constraints.B,
+        &circuit.constraints.C
+    ).unwrap();
+
+    println!("Inputs Count: {:?}", num_inputs);
+    
+    // create a VarsAssignment
+    let vars = circuit.wtns[..num_vars].iter().map(|s| s.to_bytes()).collect::<Vec<_>>();
+    println!("Vars len: {:?}", vars.len());
+
+    let assignment_vars = VarsAssignment::new(&vars).unwrap();
+
+    // create an InputsAssignment
+    let inputs = circuit.wtns[num_vars + 1..].iter().map(|s| s.to_bytes()).collect::<Vec<_>>();
+    println!("Inputs len: {:?}", inputs.len());
+    
+    let assignment_inputs = InputsAssignment::new(&inputs).unwrap();
+
+    // check if the instance we created is satisfiable
+    let res = inst.is_sat(&assignment_vars, &assignment_inputs);
+    assert_eq!(res.unwrap(), true);
+
+    // produce public parameters
+    let gens = SNARKGens::new(num_cons, num_vars, num_inputs, num_non_zero_entries);
+
+    // create a commitment to the R1CS instance
+    let (comm, decomm) = SNARK::encode(&inst, &gens);
+
+    // produce a proof of satisfiability
+    let mut prover_transcript = Transcript::new(b"snark_example");
+    let proof = SNARK::prove(
+        &inst,
+        &comm,
+        &decomm,
+        assignment_vars,
+        &assignment_inputs,
+        &gens,
+        &mut prover_transcript,
+    );
+
+    // verify the proof of satisfiability
+    let mut verifier_transcript = Transcript::new(b"snark_example");
+    assert!(proof
+        .verify(&comm, &assignment_inputs, &mut verifier_transcript, &gens)
+        .is_ok());
+    println!("proof verification successful!");
+}
 
 pub fn test() {
     // produce a tiny instance
@@ -156,7 +298,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_docs() {
-        println!("{:?}", test());
+    fn test_spartan_from_r1cs() {
+        println!("{:?}", test_r1cs());
     }
 }

@@ -591,26 +591,16 @@ describe.only("Matrix power test", () => {
 
     let data: any = {}
 
-
-    console.log("16: ", wtns[16]);
-    console.log("17: ", wtns[17]);
-
-    let prevIdx = 17;
-
-    console.log("32: ", wtns[32]);
-    console.log("33: ", wtns[33]);
-
-
     data["nInputs"] = r1cs.nPubInputs + r1cs.nPrvInputs;
     data["nOutputs"] = r1cs.nOutputs;
-    data["nVars"] = r1cs.nVars;
+    data["nVars"] = r1cs.nVars - 1 - data["nInputs"] - data["nOutputs"];
     data["nConstraints"] = r1cs.nConstraints;
 
     data["wtns"] = [
-        ...wtns.slice(r1cs.nOutputs + 1, r1cs.nOutputs + r1cs.nPubInputs + r1cs.nPrvInputs + 1),
-        "1",
-        ...wtns.slice(1, r1cs.nOutputs + 1),
-        ...wtns.slice(r1cs.nOutputs + r1cs.nPubInputs + r1cs.nPrvInputs - 1)
+      ...wtns.slice(1, r1cs.nOutputs + 1),
+      ...wtns.slice(r1cs.nOutputs + r1cs.nPubInputs + r1cs.nPrvInputs + 1),
+      "1",
+      ...wtns.slice(r1cs.nOutputs + 1, r1cs.nOutputs + r1cs.nPubInputs + r1cs.nPrvInputs + 1),
     ];
 
     data["constraints"] = {};
@@ -619,19 +609,22 @@ describe.only("Matrix power test", () => {
     data["constraints"]["C"] = [];
 
     const toNewIndex = (index: number) => {
+      /// (1, outputs, inputs, vars) -> (outputs, vars, 1, inputs)
       if (index > r1cs.nOutputs + r1cs.nPubInputs + r1cs.nPrvInputs) {
-        return index;
+        /// if vars
+        return index - data["nInputs"] - 1;
       }
 
       if (index >= r1cs.nOutputs + 1 && index <= r1cs.nOutputs + r1cs.nPubInputs + r1cs.nPrvInputs) {
-        return index - r1cs.nOutputs - 1;
+        /// if input
+        return index + data["nVars"];
       }
 
       if (index > 0 && index <= r1cs.nOutputs) {
-        return index + r1cs.nInputs;
+        return index - 1;
       }
 
-      return r1cs.nPubInputs + r1cs.nPrvInputs;
+      return data["nVars"] + data["nOutputs"];
     };
 
     for (let i = 0; i < r1cs.constraints.length; i++) {
