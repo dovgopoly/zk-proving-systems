@@ -112,13 +112,16 @@ impl SpartanCircuit {
 
 #[cfg(test)]
 mod test {
+    use std::time::Instant;
     use merlin::Transcript;
     use super::*;
 
     #[test]
     fn test_prove_verify() {
-        let params = SpartanCircuit::new().unwrap();
+        let preparing_time = Instant::now();
         
+        let params = SpartanCircuit::new().unwrap();
+
         let gens = SNARKGens::new(
             params.num_cons,
             params.num_vars + params.num_outputs,
@@ -129,6 +132,10 @@ mod test {
 
         let mut prover_transcript = Transcript::new(b"snark_example");
 
+        println!("prepared params in {:?}", preparing_time.elapsed());
+        
+        let prove_time = Instant::now();
+        
         let proof = SNARK::prove(
             &params.inst,
             &comm,
@@ -138,10 +145,16 @@ mod test {
             &gens,
             &mut prover_transcript,
         );
-
+        
+        println!("proved in {:?}", prove_time.elapsed());
+        
+        let verify_time = Instant::now();
+        
         let mut verifier_transcript = Transcript::new(b"snark_example");
         assert!(proof
             .verify(&comm, &params.assignment_inputs, &mut verifier_transcript, &gens)
             .is_ok());
+        
+        println!("verified in {:?}", verify_time.elapsed());
     }
 }

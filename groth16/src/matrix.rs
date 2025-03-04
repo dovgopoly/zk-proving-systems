@@ -48,16 +48,30 @@ impl Groth16Circuit {
 
 #[cfg(test)]
 mod test {
+    use std::time::Instant;
     use super::*;
 
     #[tokio::test]
     async fn test_prove_verify() {
+        let prepare_time = Instant::now();
+        
         let params = Groth16Circuit::new().unwrap();
+        
+        println!("prepared params in {:?}", prepare_time.elapsed());
 
+        let prove_time = Instant::now();
+        
         let proof = Groth16::<Bn254>::prove(&params.pk, params.circuit, &mut thread_rng()).unwrap();
+        
+        println!("proved in {:?}", prove_time.elapsed());
+        
+        let verify_time = Instant::now();
+        
         let ok =
             Groth16::<Bn254>::verify_with_processed_vk(&params.vk, &params.inputs, &proof).unwrap();
 
         assert!(ok);
+        
+        println!("verified in {:?}", verify_time.elapsed());
     }
 }
