@@ -28,7 +28,6 @@ import {
   MatrixScalarMultGroth16Verifier,
   MatrixTranspositionGroth16Verifier,
 } from "@/generated-types/ethers";
-import snarkjs from "snarkjs";
 
 function determinant(matrix: number[][]): number {
   const size = matrix.length;
@@ -579,11 +578,15 @@ describe.only("Matrix power test", () => {
 
     const readR1cs = require("r1csfile").readR1cs;
 
-    const r1cs = await readR1cs("pow.r1cs");
+    const r1cs = await readR1cs("../artifacts/bn128/pow.r1cs");
 
     const snarkjs = require("snarkjs");
 
-    await snarkjs.wtns.calculate({ in: input1, dummy: 0n }, "pow.wasm", "pow.wtns");
+    await snarkjs.wtns.calculate(
+        { in: input1, dummy: 0n },
+        "../artifacts/bn128/pow_js/pow.wasm",
+        "../artifacts/bn128/pow.wtns"
+    );
     const wtns = await snarkjs.wtns.exportJson("pow.wtns");
 
     console.log(r1cs);

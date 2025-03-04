@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+rand = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
 ark-groth16 = { workspace = true }
 ark-serialize = { workspace = true }
 ark-ec = { workspace = true }
@@ -15,6 +18,3 @@ ark-bn254 = { workspace = true }
 ark-bls12-381 = { workspace = true }
 ark-snark = { workspace = true }
 ark-circom = { workspace = true }
-rand = { workspace = true }
-anyhow = { workspace = true }
-tokio = { workspace = true }
