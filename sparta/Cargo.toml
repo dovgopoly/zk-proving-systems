@@ -1,0 +1,12 @@
+[package]
+name = "sparta"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+spartan = { workspace = true }
+merlin = { workspace = true }
+curve25519-dalek = { workspace = true }
+r1cs-file = { workspace = true }
+wtns-file = { workspace = true }
