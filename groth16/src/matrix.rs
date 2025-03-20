@@ -5,8 +5,8 @@ use ark_bn254::{Bn254, Fr};
 use ark_crypto_primitives::snark::SNARK;
 use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey};
 
-pub const R1CS_FILE: &str = "../artifacts/bn128/pow.r1cs";
-pub const WASM_FILE: &str = "../artifacts/bn128/pow_js/pow.wasm";
+pub const R1CS_FILE: &str = "../artifacts/bn128/multiply_big.r1cs";
+pub const WASM_FILE: &str = "../artifacts/bn128/multiply_big.wasm";
 
 pub struct Groth16Circuit {
     pub circuit: CircomCircuit<Fr>,
@@ -21,9 +21,12 @@ impl Groth16Circuit {
             CircomConfig::<Fr>::new(WASM_FILE, R1CS_FILE).map_err(|e| anyhow::anyhow!(e))?;
 
         let mut builder = CircomBuilder::new(config);
-        (0..16)
+        (0..10000)
             .into_iter()
-            .for_each(|i| builder.push_input("in", i));
+            .for_each(|i| builder.push_input("in1", i));
+        (0..10000)
+            .into_iter()
+            .for_each(|i| builder.push_input("in2", i));
         builder.push_input("dummy", 0);
 
         let circuit = builder.setup();
@@ -64,9 +67,9 @@ mod test {
         let proof = Groth16::<Bn254>::prove(&params.pk, params.circuit, &mut thread_rng()).unwrap();
         
         println!("proved in {:?}", prove_time.elapsed());
-        
+
         let verify_time = Instant::now();
-        
+
         let ok =
             Groth16::<Bn254>::verify_with_processed_vk(&params.vk, &params.inputs, &proof).unwrap();
 
